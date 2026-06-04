@@ -1,0 +1,9 @@
+ratio,placement,resident_VRAM_MiB,analytic_hit,decode_tok_s_median,decode_min,decode_max
+0.10,frequency,69760,0.427,2.43,2.41,2.44
+0.10,random,69748,0.102,2.39,2.37,2.45
+0.30,frequency,69676,0.788,2.80,2.67,2.93
+0.30,random,69674,0.297,2.39,2.36,2.43
+0.50,frequency,69800,0.949,3.78,3.62,3.97
+0.50,random,69796,0.500,2.60,2.54,2.64
+0.90,frequency,69330,1.000,112.67,110.36,113.37
+0.90,random,69334,0.898,31.30,29.91,33.20

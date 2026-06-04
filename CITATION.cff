@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "If you use these artifacts, please cite the paper."
+title: "Free Locality: When an LLM's Knowledge Memory Is DDR5-Pageable, and Why Training for It Backfires"
+authors:
+  - family-names: Vazquez
+    given-names: Billy
+    affiliation: SeyfertAI
+date-released: 2026-06-04
+version: 0.1.0
+# TODO: add the arXiv identifier + DOI once the preprint is posted.
+identifiers:
+  - type: other
+    value: "arXiv:XXXX.XXXXX"
+    description: arXiv preprint (placeholder until posted)

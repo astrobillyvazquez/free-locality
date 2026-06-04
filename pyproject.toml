@@ -1,0 +1,20 @@
+[project]
+name = "free-locality"
+version = "0.1.0"
+description = "Reproducible artifacts for the Free Locality paper (cache-locality of addressable LLM knowledge stores)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Billy Vazquez" }]
+dependencies = ["numpy>=1.24", "matplotlib>=3.7"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+capture = ["torch"]   # only for scripts/trace_to_ktransformers_stats.py (Tier-B; .pt map already committed)
+
+[tool.setuptools.packages.find]
+include = ["turboquant*"]
+
+[tool.pytest.ini_options]
+testpaths = ["turboquant/tests"]
+addopts = "-q"
