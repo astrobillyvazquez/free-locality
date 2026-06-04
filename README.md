@@ -46,6 +46,11 @@ Per-layer locality holds across the ~8× parameter scale-up: held-out hit@8% **0
 iso-0.95 VRAM **1.76× → 1.71×** — the 235B GB axis is now *measured*, not projected. Reproduce with
 `python scripts/analyze_residency_cis.py data/traces/moe_Qwen3-235B-A22B_xdoc.npz`.
 
+**Robustness (regime + domain).** Per-layer locality at 235B is not a prefill/WikiText artifact:
+held-out hit@8% = **0.366** (prefill/WikiText) → **0.304** (autoregressive decode) → **0.301** (Python
+code), all ~3.8–4.6× the frequency-blind 0.080. Reproduce:
+`python scripts/analyze_residency_cis.py data/traces/moe_Qwen3-235B-A22B_decode.npz` (or `_code.npz`).
+
 ## Reproducibility tiers (honest scope)
 - **Tier A (this repo, push-button):** every number/figure above regenerates from committed data with
   NumPy/Matplotlib. This is the credibility core.

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Confidence intervals + dynamic-policy baselines for the MoE iso-quality-VRAM result.
 
-Addresses two reviewer asks (a pre-submission review:
+Addresses two reviewer asks (a pre-submission review):
   (a) bootstrap/CV confidence intervals on the cross-document held-out hit (0.334 @ 8%) and the
       iso-0.95 VRAM ratio (1.76x), and
   (b) a *dynamic* cache baseline (LRU, Belady/OPT) scored on the SAME held-out stream as the static
@@ -180,7 +180,8 @@ def main():
         print(f"  {f:>5.2f} {m:>7d} {st:>22.3f} {lru:>8.3f} {opt:>11.3f} {f:>10.3f}")
         rows.append((f"{f:.2f}", m, f"{st:.4f}", f"{lru:.4f}", f"{opt:.4f}", f"{f:.4f}"))
 
-    tag = "" if "30B" in TRACE.name else "_" + TRACE.name.replace("moe_", "").replace("_xdoc.npz", "")
+    _stem = TRACE.stem.replace("moe_", "").replace("_xdoc", "")
+    tag = "" if "30B" in _stem else "_" + _stem
     out = Path(f"data/eval/residency_cis_lru{tag}.csv")
     out.write_text("\n".join(",".join(map(str, r)) for r in rows) + "\n")
     print(f"\nwrote {out}")
