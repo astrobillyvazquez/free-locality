@@ -12,3 +12,9 @@
 Provenance: routing was captured by running the (Apache-2.0) Qwen3-30B-A3B model over WikiText-2
 (CC-BY-SA) documents and recording per-token top-k expert selections. The committed `.npz` contains only
 aggregated routing indices (no model weights, no document text).
+
+- `moe_Qwen3-235B-A22B_xdoc.npz` — the directly-captured Qwen3-235B-A22B routing trace (94 MoE layers x 128
+  experts, top-8, 32 cross-document WikiText documents; arrays `L{0..93}_idx` = `(n_tokens, 8)`, `doc_id`,
+  `n_slots=128`). The scale-confirmation artifact: per-layer locality holds at ~8x the parameters of the 30B
+  trace, so the iso-quality-VRAM GB axis is measured at 235B rather than projected. Captured in 4-bit NF4 on
+  one 80GB-class GPU (transformers 4.57.1; see the paper's reproducibility notes).

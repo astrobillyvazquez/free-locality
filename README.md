@@ -33,7 +33,18 @@ CI (`.github/workflows/ci.yml`) runs all three on every push.
 | iso-quality-VRAM figure | `make figures` | `figures/paper_vram_isoquality.png` |
 | Live KTransformers knee (frequency vs random, 1.02×→3.60×) | `make figures` (data: `data/eval/ktransformers_live_h100_ratio_sweep.csv`) | `figures/paper_livedemo_knee.png` |
 | KTransformers `--init-expert-location` frequency map | `python scripts/trace_to_ktransformers_stats.py data/traces/moe_Qwen3-30B-A3B_xdoc.npz -o /tmp/stats.pt` (needs `pip install ".[capture]"`) | `static-freq hit @ 7.8% = 0.359` |
+| **235B (measured) held-out hit@8% = 0.366** vs 0.080 blind | `python scripts/analyze_residency_cis.py data/traces/moe_Qwen3-235B-A22B_xdoc.npz` | `held-out hit@8% = 0.366` |
+| **235B (measured) iso-0.95 VRAM 1.72x** (95% CV [1.58,1.77]) | (same command) | `iso-0.95 VRAM ratio = 1.72x` |
+| 235B measured iso-VRAM figure (native geometry) | `make figures` | `figures/paper_vram_isoquality_235B_measured.png` |
 | Locality engine known-answer tests | `pytest` | all pass |
+
+
+## Scale confirmation (30B → 235B, measured)
+The 30B-A3B iso-quality-VRAM result is **confirmed by direct measurement** on a real Qwen3-235B-A22B
+routing trace (94 MoE layers × 128 experts, top-8, 32 cross-document docs) at the same universe/k = 16.
+Per-layer locality holds across the ~8× parameter scale-up: held-out hit@8% **0.334 (30B) → 0.366 (235B)**,
+iso-0.95 VRAM **1.76× → 1.71×** — the 235B GB axis is now *measured*, not projected. Reproduce with
+`python scripts/analyze_residency_cis.py data/traces/moe_Qwen3-235B-A22B_xdoc.npz`.
 
 ## Reproducibility tiers (honest scope)
 - **Tier A (this repo, push-button):** every number/figure above regenerates from committed data with

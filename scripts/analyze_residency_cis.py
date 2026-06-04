@@ -23,15 +23,19 @@ for reference. The 235B D2 run (32 docs) will tighten this materially.
 """
 from __future__ import annotations
 import itertools
+import math
+import sys
 from collections import OrderedDict
 from pathlib import Path
 
 import numpy as np
 
-TRACE = Path("data/traces/moe_Qwen3-30B-A3B_xdoc.npz")
+TRACE = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("data/traces/moe_Qwen3-30B-A3B_xdoc.npz")
 FRACS = (0.08, 0.10, 0.30, 0.50)     # per-layer resident fractions to report LRU/static/blind at
 TARGET = 0.95                         # iso-hit-rate for the VRAM-ratio metric
 ANCHOR_F = 0.08                       # the paper's 8% anchor
+MAX_ENUM = 200                        # enumerate all calib/eval splits if C(n, n/2) <= this, else sample
+N_RANDOM_SPLITS = 400                 # random balanced splits when enumeration is too large
 
 
 def load():
@@ -40,10 +44,8 @@ def load():
     n_slots = int(d["n_slots"])
     doc_id = d["doc_id"]
     docs = np.unique(doc_id).tolist()
-    # per (layer, doc) count vector, and the per-(layer) ordered eval token stream builder
     idx = {L: d[f"L{L}_idx"] for L in layers}
     k = int(idx[layers[0]].shape[1])
-    # counts[L][doc] = (n_slots,) access counts
     counts = {L: {dd: np.bincount(idx[L][doc_id == dd].reshape(-1), minlength=n_slots)[:n_slots]
                   .astype(np.float64) for dd in docs} for L in layers}
     return layers, n_slots, k, docs, doc_id, idx, counts
@@ -135,29 +137,39 @@ def main():
     ratio0, mt0 = iso_ratio(curve0, n_slots)
     print(f"[canonical even/odd split]  held-out hit@8% = {hit0:.3f}   iso-0.95 VRAM ratio = {ratio0:.2f}x (freq m={mt0})")
 
-    # --- all C(8,4)=70 calib/eval partitions: CV band ---
+    # --- CV band over calib/eval partitions: enumerate all if few docs, else sample random balanced splits ---
+    nd = len(docs); half = nd // 2
+    n_comb = math.comb(nd, half)
+    rng = np.random.default_rng(0)
+    if n_comb <= MAX_ENUM:
+        split_iter = ([list(cal), [d for d in docs if d not in cal]]
+                      for cal in itertools.combinations(docs, half))
+        n_splits, how = n_comb, f"all {n_comb} calib/eval splits"
+    else:
+        def _rand():
+            for _ in range(N_RANDOM_SPLITS):
+                p = rng.permutation(docs); yield list(p[:half]), list(p[half:])
+        split_iter, n_splits, how = _rand(), N_RANDOM_SPLITS, f"{N_RANDOM_SPLITS} random {half}/{nd-half} splits"
     hits, ratios = [], []
-    for cal in itertools.combinations(docs, len(docs) // 2):
-        ev = [d for d in docs if d not in cal]
-        hits.append(heldout_hit_at_m(layers, counts, list(cal), ev, m8))
-        c = heldout_curve(layers, counts, list(cal), ev, n_slots)
-        ratios.append(iso_ratio(c, n_slots)[0])
+    for cal, ev in split_iter:
+        hits.append(heldout_hit_at_m(layers, counts, cal, ev, m8))
+        ratios.append(iso_ratio(heldout_curve(layers, counts, cal, ev, n_slots), n_slots)[0])
     hits, ratios = np.array(hits), np.array(ratios)
     def band(a): return np.percentile(a, 2.5), np.median(a), np.percentile(a, 97.5)
     h_lo, h_md, h_hi = band(hits); r_lo, r_md, r_hi = band(ratios)
-    print(f"[all 70 calib/eval splits] held-out hit@8% : median {h_md:.3f}  95% CV band [{h_lo:.3f}, {h_hi:.3f}]")
-    print(f"[all 70 calib/eval splits] iso-0.95 ratio  : median {r_md:.2f}x 95% CV band [{r_lo:.2f}, {r_hi:.2f}]x")
+    print(f"[{how}] held-out hit@8% : median {h_md:.3f}  95% CV band [{h_lo:.3f}, {h_hi:.3f}]")
+    print(f"[{how}] iso-0.95 ratio  : median {r_md:.2f}x 95% CV band [{r_lo:.2f}, {r_hi:.2f}]x")
 
-    # --- doc-level bootstrap over the 4 canonical eval docs (reference; coarse at n=4) ---
-    rng = np.random.default_rng(0); B = 2000; bh = []
+    # --- doc-level bootstrap over the canonical eval docs ---
+    B = 2000; bh = []
     for _ in range(B):
         samp = list(rng.choice(ev0, size=len(ev0), replace=True))
         bh.append(heldout_hit_at_m(layers, counts, cal0, samp, m8))
     bh = np.array(bh)
-    print(f"[bootstrap eval docs n=4]  held-out hit@8% : 95% CI [{np.percentile(bh,2.5):.3f}, {np.percentile(bh,97.5):.3f}]\n")
+    print(f"[bootstrap eval docs n={len(ev0)}]  held-out hit@8% : 95% CI [{np.percentile(bh,2.5):.3f}, {np.percentile(bh,97.5):.3f}]\n")
 
     # --- dynamic-policy baselines on the held-out (eval) stream ---
-    print("Dynamic vs static, scored on the SAME held-out eval stream (4 docs):")
+    print(f"Dynamic vs static, scored on the SAME held-out eval stream ({len(ev0)} docs):")
     print(f"  {'f':>5} {'m/layer':>7} {'static-freq(held-out)':>22} {'LRU':>8} {'Belady/OPT':>11} {'blind(=f)':>10}")
     rows = [("frac", "m", "static_heldout", "lru", "belady", "blind")]
     for f in FRACS:
@@ -168,7 +180,8 @@ def main():
         print(f"  {f:>5.2f} {m:>7d} {st:>22.3f} {lru:>8.3f} {opt:>11.3f} {f:>10.3f}")
         rows.append((f"{f:.2f}", m, f"{st:.4f}", f"{lru:.4f}", f"{opt:.4f}", f"{f:.4f}"))
 
-    out = Path("data/eval/residency_cis_lru.csv")
+    tag = "" if "30B" in TRACE.name else "_" + TRACE.name.replace("moe_", "").replace("_xdoc.npz", "")
+    out = Path(f"data/eval/residency_cis_lru{tag}.csv")
     out.write_text("\n".join(",".join(map(str, r)) for r in rows) + "\n")
     print(f"\nwrote {out}")
     # machine-readable summary line for the findings doc
